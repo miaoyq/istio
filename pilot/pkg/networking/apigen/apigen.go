@@ -40,11 +40,14 @@ import (
 type APIGenerator struct {
 	// ConfigStore interface for listing istio api resources.
 	store model.ConfigStore
+
+	svcDiscovery model.ServiceDiscovery
 }
 
-func NewGenerator(store model.ConfigStore) *APIGenerator {
+func NewGenerator(store model.ConfigStore, svcDiscovery model.ServiceDiscovery) *APIGenerator {
 	return &APIGenerator{
-		store: store,
+		store:        store,
+		svcDiscovery: svcDiscovery,
 	}
 }
 
@@ -129,8 +132,18 @@ func (g *APIGenerator) Generate(proxy *model.Proxy, w *model.WatchedResource, re
 		}
 	}
 
+	svcs := g.svcDiscovery.Services()
+	instances := make([]*model.ServiceInstance, 0)
+	for _, svc := range svcs {
+		for _, p := range svc.Ports {
+			insts := g.svcDiscovery.InstancesByPort(svc, p.Port)
+			instances = append(instances, insts...)
+		}
+	}
+
 	if w.TypeUrl == gvk.WorkloadEntry.String() {
-		configs := serviceentry.ServiceInstancesToWorkloadEntries(proxy.ServiceInstances)
+		g.svcDiscovery.Services()
+		configs := serviceentry.ServiceInstancesToWorkloadEntries(instances)
 		for _, c := range configs {
 			b, err := config.PilotConfigToResource(c)
 			if err != nil {
