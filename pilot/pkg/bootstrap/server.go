@@ -1139,7 +1139,7 @@ func (s *Server) initControllers(args *PilotArgs) error {
 	log.Info("initializing controllers")
 	s.initMulticluster(args)
 
-	s.initSDSServer()
+	// s.initSDSServer()
 
 	// Certificate controller is created before MCP controller in case MCP server pod
 	// waits to mount a certificate to be provisioned by the certificate controller.
