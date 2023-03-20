@@ -321,19 +321,19 @@ func NewServer(args *PilotArgs, initFuncs ...func(*Server)) (*Server, error) {
 	}
 
 	// common https server for webhooks (e.g. injection, validation)
-	if s.kubeClient != nil {
-		s.initSecureWebhookServer(args)
-		wh, err := s.initSidecarInjector(args)
-		if err != nil {
-			return nil, fmt.Errorf("error initializing sidecar injector: %v", err)
-		}
-		s.webhookInfo.mu.Lock()
-		s.webhookInfo.wh = wh
-		s.webhookInfo.mu.Unlock()
-		if err := s.initConfigValidation(args); err != nil {
-			return nil, fmt.Errorf("error initializing config validator: %v", err)
-		}
-	}
+	//if s.kubeClient != nil {
+	//	s.initSecureWebhookServer(args)
+	//	wh, err := s.initSidecarInjector(args)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("error initializing sidecar injector: %v", err)
+	//	}
+	//	s.webhookInfo.mu.Lock()
+	//	s.webhookInfo.wh = wh
+	//	s.webhookInfo.mu.Unlock()
+	//	if err := s.initConfigValidation(args); err != nil {
+	//		return nil, fmt.Errorf("error initializing config validator: %v", err)
+	//	}
+	//}
 
 	// This should be called only after controllers are initialized.
 	s.initRegistryEventHandlers()
