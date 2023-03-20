@@ -71,7 +71,6 @@ import (
 	"istio.io/istio/security/pkg/pki/ca"
 	"istio.io/istio/security/pkg/pki/ra"
 	"istio.io/istio/security/pkg/server/ca/authenticate"
-	"istio.io/istio/security/pkg/server/ca/authenticate/kubeauth"
 	"istio.io/pkg/ctrlz"
 	"istio.io/pkg/filewatcher"
 	"istio.io/pkg/log"
@@ -344,35 +343,35 @@ func NewServer(args *PilotArgs, initFuncs ...func(*Server)) (*Server, error) {
 	// Notice that the order of authenticators matters, since at runtime
 	// authenticators are activated sequentially and the first successful attempt
 	// is used as the authentication result.
-	authenticators := []security.Authenticator{
-		&authenticate.ClientCertAuthenticator{},
-	}
-	if args.JwtRule != "" {
-		jwtAuthn, err := initOIDC(args)
-		if err != nil {
-			return nil, fmt.Errorf("error initializing OIDC: %v", err)
-		}
-		if jwtAuthn == nil {
-			return nil, fmt.Errorf("JWT authenticator is nil")
-		}
-		authenticators = append(authenticators, jwtAuthn)
-	}
-	// The k8s JWT authenticator requires the multicluster registry to be initialized,
-	// so we build it later.
-	if s.kubeClient != nil {
-		authenticators = append(authenticators,
-			kubeauth.NewKubeJWTAuthenticator(s.environment.Watcher, s.kubeClient.Kube(), s.clusterID, s.multiclusterController.GetRemoteKubeClient, features.JwtPolicy))
-	}
-	if len(features.TrustedGatewayCIDR) > 0 {
-		authenticators = append(authenticators, &authenticate.XfccAuthenticator{})
-	}
-	if features.XDSAuth {
-		s.XDSServer.Authenticators = authenticators
-	}
-	caOpts.Authenticators = authenticators
-
-	// Start CA or RA server. This should be called after CA and Istiod certs have been created.
-	s.startCA(caOpts)
+	//authenticators := []security.Authenticator{
+	//	&authenticate.ClientCertAuthenticator{},
+	//}
+	//if args.JwtRule != "" {
+	//	jwtAuthn, err := initOIDC(args)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("error initializing OIDC: %v", err)
+	//	}
+	//	if jwtAuthn == nil {
+	//		return nil, fmt.Errorf("JWT authenticator is nil")
+	//	}
+	//	authenticators = append(authenticators, jwtAuthn)
+	//}
+	//// The k8s JWT authenticator requires the multicluster registry to be initialized,
+	//// so we build it later.
+	//if s.kubeClient != nil {
+	//	authenticators = append(authenticators,
+	//		kubeauth.NewKubeJWTAuthenticator(s.environment.Watcher, s.kubeClient.Kube(), s.clusterID, s.multiclusterController.GetRemoteKubeClient, features.JwtPolicy))
+	//}
+	//if len(features.TrustedGatewayCIDR) > 0 {
+	//	authenticators = append(authenticators, &authenticate.XfccAuthenticator{})
+	//}
+	//if features.XDSAuth {
+	//	s.XDSServer.Authenticators = authenticators
+	//}
+	//caOpts.Authenticators = authenticators
+	//
+	//// Start CA or RA server. This should be called after CA and Istiod certs have been created.
+	//s.startCA(caOpts)
 
 	// TODO: don't run this if galley is started, one ctlz is enough
 	if args.CtrlZOptions != nil {
