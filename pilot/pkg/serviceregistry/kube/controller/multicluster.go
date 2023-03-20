@@ -41,7 +41,6 @@ import (
 	kubelib "istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/multicluster"
 	"istio.io/istio/pkg/kube/namespace"
-	"istio.io/istio/pkg/webhooks"
 )
 
 const (
@@ -309,20 +308,20 @@ func (m *Multicluster) initializeCluster(cluster *multicluster.Cluster, kubeCont
 	// The config cluster has this patching set up elsewhere. We may eventually want to move it here.
 	// We can not use leader election for webhook patching because each revision needs to patch its own
 	// webhook.
-	if shouldLead && !configCluster && m.caBundleWatcher != nil {
-		// Patch injection webhook cert
-		// This requires RBAC permissions - a low-priv Istiod should not attempt to patch but rely on
-		// operator or CI/CD
-		if features.InjectionWebhookConfigName != "" {
-			log.Infof("initializing injection webhook cert patcher for cluster %s", cluster.ID)
-			patcher, err := webhooks.NewWebhookCertPatcher(client, m.revision, webhookName, m.caBundleWatcher)
-			if err != nil {
-				log.Errorf("could not initialize webhook cert patcher: %v", err)
-			} else {
-				go patcher.Run(clusterStopCh)
-			}
-		}
-	}
+	//if shouldLead && !configCluster && m.caBundleWatcher != nil {
+	//	// Patch injection webhook cert
+	//	// This requires RBAC permissions - a low-priv Istiod should not attempt to patch but rely on
+	//	// operator or CI/CD
+	//	if features.InjectionWebhookConfigName != "" {
+	//		log.Infof("initializing injection webhook cert patcher for cluster %s", cluster.ID)
+	//		patcher, err := webhooks.NewWebhookCertPatcher(client, m.revision, webhookName, m.caBundleWatcher)
+	//		if err != nil {
+	//			log.Errorf("could not initialize webhook cert patcher: %v", err)
+	//		} else {
+	//			go patcher.Run(clusterStopCh)
+	//		}
+	//	}
+	//}
 
 	// setting up the serviceexport controller if and only if it is turned on in the meshconfig.
 	if features.EnableMCSAutoExport {
