@@ -129,5 +129,20 @@ func (g *APIGenerator) Generate(proxy *model.Proxy, w *model.WatchedResource, re
 		}
 	}
 
+	if w.TypeUrl == gvk.WorkloadEntry.String() {
+		configs := serviceentry.ServiceInstancesToWorkloadEntries(proxy.ServiceInstances)
+		for _, c := range configs {
+			b, err := config.PilotConfigToResource(c)
+			if err != nil {
+				log.Warn("Resource error ", err, " ", c.Namespace, "/", c.Name)
+				continue
+			}
+			resp = append(resp, &discovery.Resource{
+				Name:     c.Namespace + "/" + c.Name,
+				Resource: protoconv.MessageToAny(b),
+			})
+		}
+	}
+
 	return resp, model.DefaultXdsLogDetails, nil
 }

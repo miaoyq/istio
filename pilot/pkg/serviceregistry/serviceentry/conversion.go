@@ -449,3 +449,67 @@ func (s *Controller) convertWorkloadEntryToWorkloadInstance(cfg config.Config, c
 		DNSServiceEntryOnly: dnsServiceEntryOnly,
 	}
 }
+
+func ServiceInstancesToWorkloadEntries(svcInsts []*model.ServiceInstance) []*config.Config {
+	svcToEps := make(map[*model.Service]map[string][]*model.IstioEndpoint, 0)
+
+	for _, inst := range svcInsts {
+		if svcToEps[inst.Service] == nil {
+			svcToEps[inst.Service] = make(map[string][]*model.IstioEndpoint, 0)
+		}
+		svcToEps[inst.Service][inst.Endpoint.Address] =
+			append(svcToEps[inst.Service][inst.Endpoint.Address], inst.Endpoint)
+	}
+
+	gvk := gvk.WorkloadEntry
+	var configs []*config.Config
+	for svc, adToEps := range svcToEps {
+		for ad, eps := range adToEps {
+			for _, ep := range eps {
+
+				portMap := make(map[string]uint32)
+				for _, p := range svc.Ports {
+					portMap[p.Name] = uint32(p.Port)
+				}
+
+				we := &networking.WorkloadEntry{
+					Address:  ad,
+					Ports:    portMap,             // map[string]uint32
+					Labels:   ep.Labels,           // map[string]string
+					Network:  ep.Network.String(), // string
+					Locality: ep.Locality.Label,   // string `protobuf:"bytes,5,opt,name=locality,proto3" json:"locality,omitempty"`
+					// The load balancing weight associated with the endpoint. Endpoints
+					// with higher weights will receive proportionally higher traffic.
+					Weight: ep.LbWeight, // uint32 `protobuf:"varint,6,opt,name=weight,proto3" json:"weight,omitempty"`
+					// The service account associated with the workload if a sidecar
+					// is present in the workload. The service account must be present
+					// in the same namespace as the configuration ( WorkloadEntry or a
+					// ServiceEntry)
+					ServiceAccount: ep.ServiceAccount, // string
+				}
+
+				// TODO: 将workloadName，node，cluster等配置放在annotation中，避免信息失真
+
+				var name string
+				if ep.WorkloadName != "" {
+					name = "synthetic-" + ep.WorkloadName + "-" + ep.Address
+				} else {
+					name = "synthetic-" + svc.Attributes.Name + "-" + ep.Address
+				}
+				cfg := &config.Config{
+					Meta: config.Meta{
+						GroupVersionKind: gvk,
+						Name:             name,
+						Namespace:        ep.Namespace,
+						//CreationTimestamp: svc.CreationTime,
+						//ResourceVersion:   svc.ResourceVersion,
+					},
+					Spec: we,
+				}
+				configs = append(configs, cfg)
+			}
+		}
+	}
+
+	return configs
+}
