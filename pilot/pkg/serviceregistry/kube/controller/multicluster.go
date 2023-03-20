@@ -40,7 +40,6 @@ import (
 	"istio.io/istio/pkg/config/schema/gvk"
 	kubelib "istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/multicluster"
-	"istio.io/istio/pkg/kube/namespace"
 )
 
 const (
@@ -271,39 +270,39 @@ func (m *Multicluster) initializeCluster(cluster *multicluster.Cluster, kubeCont
 	}
 
 	// namespacecontroller requires discoverySelectors only if EnableEnhancedResourceScoping feature flag is set.
-	discoveryNamespacesFilter := namespace.DiscoveryNamespacesFilter(nil)
-	if features.EnableEnhancedResourceScoping {
-		discoveryNamespacesFilter = kubeRegistry.opts.DiscoveryNamespacesFilter
-	}
+	//discoveryNamespacesFilter := namespace.DiscoveryNamespacesFilter(nil)
+	//if features.EnableEnhancedResourceScoping {
+	//	discoveryNamespacesFilter = kubeRegistry.opts.DiscoveryNamespacesFilter
+	//}
 
 	// run after WorkloadHandler is added
 	m.opts.MeshServiceController.AddRegistryAndRun(kubeRegistry, clusterStopCh)
 
-	shouldLead := m.checkShouldLead(client, options.SystemNamespace)
-	log.Infof("should join leader-election for cluster %s: %t", cluster.ID, shouldLead)
-
-	if m.startNsController && (shouldLead || configCluster) {
-		// Block server exit on graceful termination of the leader controller.
-		m.s.RunComponentAsyncAndWait(func(_ <-chan struct{}) error {
-			log.Infof("joining leader-election for %s in %s on cluster %s",
-				leaderelection.NamespaceController, options.SystemNamespace, options.ClusterID)
-			election := leaderelection.
-				NewLeaderElectionMulticluster(options.SystemNamespace, m.serverID, leaderelection.NamespaceController, m.revision, !configCluster, client).
-				AddRunFunction(func(leaderStop <-chan struct{}) {
-					log.Infof("starting namespace controller for cluster %s", cluster.ID)
-					nc := NewNamespaceController(client, m.caBundleWatcher, discoveryNamespacesFilter)
-					// Start informers again. This fixes the case where informers for namespace do not start,
-					// as we create them only after acquiring the leader lock
-					// Note: stop here should be the overall pilot stop, NOT the leader election stop. We are
-					// basically lazy loading the informer, if we stop it when we lose the lock we will never
-					// recreate it again.
-					client.RunAndWait(clusterStopCh)
-					nc.Run(leaderStop)
-				})
-			election.Run(clusterStopCh)
-			return nil
-		})
-	}
+	//	shouldLead := m.checkShouldLead(client, options.SystemNamespace)
+	//log.Infof("should join leader-election for cluster %s: %t", cluster.ID, shouldLead)
+	//
+	//if m.startNsController && (shouldLead || configCluster) {
+	//	// Block server exit on graceful termination of the leader controller.
+	//	m.s.RunComponentAsyncAndWait(func(_ <-chan struct{}) error {
+	//		log.Infof("joining leader-election for %s in %s on cluster %s",
+	//			leaderelection.NamespaceController, options.SystemNamespace, options.ClusterID)
+	//		election := leaderelection.
+	//			NewLeaderElectionMulticluster(options.SystemNamespace, m.serverID, leaderelection.NamespaceController, m.revision, !configCluster, client).
+	//			AddRunFunction(func(leaderStop <-chan struct{}) {
+	//				log.Infof("starting namespace controller for cluster %s", cluster.ID)
+	//				nc := NewNamespaceController(client, m.caBundleWatcher, discoveryNamespacesFilter)
+	//				// Start informers again. This fixes the case where informers for namespace do not start,
+	//				// as we create them only after acquiring the leader lock
+	//				// Note: stop here should be the overall pilot stop, NOT the leader election stop. We are
+	//				// basically lazy loading the informer, if we stop it when we lose the lock we will never
+	//				// recreate it again.
+	//				client.RunAndWait(clusterStopCh)
+	//				nc.Run(leaderStop)
+	//			})
+	//		election.Run(clusterStopCh)
+	//		return nil
+	//	})
+	//}
 	// Set up injection webhook patching for remote clusters we are controlling.
 	// The config cluster has this patching set up elsewhere. We may eventually want to move it here.
 	// We can not use leader election for webhook patching because each revision needs to patch its own
