@@ -500,7 +500,7 @@ func ServiceInstancesToWorkloadEntries(svcInsts []*model.ServiceInstance) []*con
 					Meta: config.Meta{
 						GroupVersionKind: gvk,
 						Name:             name,
-						Namespace:        ep.Namespace,
+						Namespace:        svc.Attributes.Namespace,
 						//CreationTimestamp: svc.CreationTime,
 						//ResourceVersion:   svc.ResourceVersion,
 					},

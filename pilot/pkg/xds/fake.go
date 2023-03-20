@@ -248,7 +248,7 @@ func NewFakeDiscoveryServer(t test.Failer, opts FakeOptions) *FakeDiscoveryServe
 	if err := s.Env.InitNetworksManager(s); err != nil {
 		t.Fatal(err)
 	}
-	s.Generators["api"] = apigen.NewGenerator(s.Env.ConfigStore)
+	s.Generators["api"] = apigen.NewGenerator(s.Env.ConfigStore, s.Env.ServiceDiscovery)
 	// Disable debounce to reduce test times
 	s.debounceOptions.debounceAfter = opts.DebounceTime
 	memRegistry := cg.MemRegistry
