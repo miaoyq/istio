@@ -472,6 +472,12 @@ func ServiceInstancesToWorkloadEntries(svcInsts []*model.ServiceInstance) []*con
 					portMap[p.Name] = uint32(p.Port)
 				}
 
+				sa := ep.ServiceAccount
+				id, err := spiffe.ParseIdentity(ep.ServiceAccount)
+				if err == nil {
+					sa = id.ServiceAccount
+				}
+
 				we := &networking.WorkloadEntry{
 					Address:  ad,
 					Ports:    portMap,             // map[string]uint32
@@ -485,7 +491,7 @@ func ServiceInstancesToWorkloadEntries(svcInsts []*model.ServiceInstance) []*con
 					// is present in the workload. The service account must be present
 					// in the same namespace as the configuration ( WorkloadEntry or a
 					// ServiceEntry)
-					ServiceAccount: ep.ServiceAccount, // string
+					ServiceAccount: sa, // string
 				}
 
 				// TODO: 将workloadName，node，cluster等配置放在annotation中，避免信息失真
