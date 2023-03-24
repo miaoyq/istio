@@ -15,6 +15,7 @@
 package controller
 
 import (
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,6 +38,7 @@ type kubeEndpointsController interface {
 	// * namespace: sync that namespace
 	// * neither: sync all namespaces
 	sync(name, ns string, event model.Event, filtered bool) error
+	WorkloadEntries() []*networkingv1alpha3.WorkloadEntry
 	InstancesByPort(c *Controller, svc *model.Service, reqSvcPort int) []*model.ServiceInstance
 	GetProxyServiceInstances(c *Controller, proxy *model.Proxy) []*model.ServiceInstance
 	buildIstioEndpoints(ep any, host host.Name) []*model.IstioEndpoint

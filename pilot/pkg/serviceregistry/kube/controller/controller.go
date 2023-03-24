@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"istio.io/api/label"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/serviceregistry"
@@ -838,6 +839,11 @@ func (c *Controller) GetService(hostname host.Name) *model.Service {
 	svc := c.servicesMap[hostname]
 	c.RUnlock()
 	return svc
+}
+
+// WorkloadEntries ...
+func (c *Controller) WorkloadEntries() []*networkingv1alpha3.WorkloadEntry {
+	return c.endpoints.WorkloadEntries()
 }
 
 // getPodLocality retrieves the locality for a pod.

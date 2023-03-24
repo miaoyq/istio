@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	networking "istio.io/api/networking/v1alpha3"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/model/status"
@@ -635,6 +636,11 @@ func (s *Controller) GetService(hostname host.Name) *model.Service {
 		}
 	}
 
+	return nil
+}
+
+// WorkloadEntries ...
+func (c *Controller) WorkloadEntries() []*networkingv1alpha3.WorkloadEntry {
 	return nil
 }
 

@@ -20,6 +20,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/serviceregistry"
@@ -284,6 +285,23 @@ func (c *Controller) GetService(hostname host.Name) *model.Service {
 		} else {
 			// If we are seeing the service for the second time, it means it is available in multiple clusters.
 			mergeService(out, service, r)
+		}
+	}
+	return out
+}
+
+// WorkloadEntries ...
+func (c *Controller) WorkloadEntries() []*networkingv1alpha3.WorkloadEntry {
+	var out []*networkingv1alpha3.WorkloadEntry
+	for _, r := range c.GetRegistries() {
+		wes := r.WorkloadEntries()
+		if len(wes) == 0 {
+			continue
+		}
+
+		for _, we := range wes {
+			weCopy := we.DeepCopy()
+			out = append(out, weCopy)
 		}
 	}
 	return out

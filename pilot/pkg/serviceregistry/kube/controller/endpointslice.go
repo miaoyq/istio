@@ -18,6 +18,9 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
+	"istio.io/istio/pkg/config/schema/gvk"
+	"istio.io/istio/pkg/config/schema/kind"
 	v1 "k8s.io/api/discovery/v1"
 	"k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,10 +34,12 @@ import (
 	"istio.io/istio/pkg/config"
 	"istio.io/istio/pkg/config/host"
 	"istio.io/istio/pkg/kube/kclient"
+	"istio.io/istio/pkg/util/sets"
 )
 
 type endpointSliceController struct {
 	endpointCache *endpointSliceCache
+	weCache       workloadEntryCache
 	slices        kclient.Client[*v1.EndpointSlice]
 	c             *Controller
 }
@@ -210,6 +215,10 @@ func (esc *endpointSliceController) updateEndpointCacheForSlice(hostName host.Na
 	svc := esc.c.GetService(hostName)
 	discoverabilityPolicy := esc.c.exports.EndpointDiscoverabilityPolicy(svc)
 
+	key := types.NamespacedName{Namespace: slice.Namespace, Name: slice.Name}
+	oldWes := esc.weCache.Get(key)
+
+	var workloadEntris []*networkingv1alpha3.WorkloadEntry
 	for _, e := range slice.Endpoints {
 		// Draining tracking is only enabled if persistent sessions is enabled.
 		// If we start using them for other features, this can be adjusted.
@@ -241,8 +250,35 @@ func (esc *endpointSliceController) updateEndpointCacheForSlice(hostName host.Na
 				istioEndpoint := builder.buildIstioEndpoint(a, portNum, portName, discoverabilityPolicy, healthStatus)
 				endpoints = append(endpoints, istioEndpoint)
 			}
+
+			ports := make(map[string]uint32)
+			for _, ep := range slice.Ports {
+				if ep.Name != nil && ep.Port != nil {
+					ports[*ep.Name] = uint32(*ep.Port)
+				}
+			}
+			we := builder.buildWorkloadEntry(a, ports)
+			workloadEntris = append(workloadEntris, we)
 		}
 	}
+
+	esc.weCache.Update(key, workloadEntris)
+
+	// If the ep is not converted to WorkloadEntry after conversion,
+	//the storage unit corresponding to the endpoint is deleted
+	if len(oldWes) != 0 || len(workloadEntris) != 0 {
+		configsUpdated := sets.New[model.ConfigKey]()
+		for _, we := range workloadEntris {
+			configsUpdated.Insert(model.ConfigKey{Kind: kind.MustFromGVK(gvk.WorkloadEntry), Name: we.Name, Namespace: we.Namespace})
+		}
+		pushReq := &model.PushRequest{
+			Full:           true,
+			ConfigsUpdated: configsUpdated,
+			Reason:         []model.TriggerReason{model.ConfigUpdate},
+		}
+		esc.c.opts.XDSUpdater.ConfigUpdate(pushReq)
+	}
+
 	esc.endpointCache.Update(hostName, slice.Name, endpoints)
 }
 
@@ -270,6 +306,10 @@ func (esc *endpointSliceController) getServiceNamespacedName(es any) types.Names
 		Namespace: slice.GetNamespace(),
 		Name:      serviceNameForEndpointSlice(slice.GetLabels()),
 	}
+}
+
+func (esc *endpointSliceController) WorkloadEntries() []*networkingv1alpha3.WorkloadEntry {
+	return esc.weCache.GetAll()
 }
 
 func (esc *endpointSliceController) InstancesByPort(c *Controller, svc *model.Service, reqSvcPort int) []*model.ServiceInstance {

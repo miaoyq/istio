@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	"istio.io/istio/pilot/pkg/config/kube/crdclient"
 
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/serviceregistry/provider"
@@ -132,26 +133,39 @@ func (g *APIGenerator) Generate(proxy *model.Proxy, w *model.WatchedResource, re
 		}
 	}
 
-	svcs := g.svcDiscovery.Services()
-	instances := make([]*model.ServiceInstance, 0)
-	for _, svc := range svcs {
-		for _, p := range svc.Ports {
-			insts := g.svcDiscovery.InstancesByPort(svc, p.Port)
-			instances = append(instances, insts...)
-		}
-	}
+	//svcs := g.svcDiscovery.Services()
+	//instances := make([]*model.ServiceInstance, 0)
+	//for _, svc := range svcs {
+	//	for _, p := range svc.Ports {
+	//		insts := g.svcDiscovery.InstancesByPort(svc, p.Port)
+	//		instances = append(instances, insts...)
+	//	}
+	//}
 
 	if w.TypeUrl == gvk.WorkloadEntry.String() {
-		g.svcDiscovery.Services()
-		configs := serviceentry.ServiceInstancesToWorkloadEntries(instances)
-		for _, c := range configs {
-			b, err := config.PilotConfigToResource(c)
+		//configs := serviceentry.ServiceInstancesToWorkloadEntries(instances)
+		//for _, c := range configs {
+		//	b, err := config.PilotConfigToResource(c)
+		//	if err != nil {
+		//		log.Warn("Resource error ", err, " ", c.Namespace, "/", c.Name)
+		//		continue
+		//	}
+		//	resp = append(resp, &discovery.Resource{
+		//		Name:     c.Namespace + "/" + c.Name,
+		//		Resource: protoconv.MessageToAny(b),
+		//	})
+		//}
+
+		wes := g.svcDiscovery.WorkloadEntries()
+		for _, we := range wes {
+			weConfig := crdclient.TranslateObject(we, gvk.WorkloadEntry, "")
+			b, err := config.PilotConfigToResource(&weConfig)
 			if err != nil {
-				log.Warn("Resource error ", err, " ", c.Namespace, "/", c.Name)
+				log.Warn("Resource error ", err, " ", we.Namespace, "/", we.Name)
 				continue
 			}
 			resp = append(resp, &discovery.Resource{
-				Name:     c.Namespace + "/" + c.Name,
+				Name:     we.Namespace + "/" + we.Name,
 				Resource: protoconv.MessageToAny(b),
 			})
 		}

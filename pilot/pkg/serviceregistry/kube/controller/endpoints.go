@@ -15,7 +15,12 @@
 package controller
 
 import (
+	"sync"
+
 	"github.com/hashicorp/go-multierror"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
+	"istio.io/istio/pkg/config/schema/gvk"
+	"istio.io/istio/pkg/config/schema/kind"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -26,10 +31,12 @@ import (
 	"istio.io/istio/pkg/config"
 	"istio.io/istio/pkg/config/host"
 	"istio.io/istio/pkg/kube/kclient"
+	"istio.io/istio/pkg/util/sets"
 )
 
 type endpointsController struct {
 	endpoints kclient.Client[*v1.Endpoints]
+	weCache   workloadEntryCache
 	c         *Controller
 }
 
@@ -98,6 +105,10 @@ func endpointServiceInstances(c *Controller, endpoints *v1.Endpoints, proxy *mod
 	}
 
 	return out
+}
+
+func (e *endpointsController) WorkloadEntries() []*networkingv1alpha3.WorkloadEntry {
+	return e.weCache.GetAll()
 }
 
 func (e *endpointsController) InstancesByPort(c *Controller, svc *model.Service, reqSvcPort int) []*model.ServiceInstance {
@@ -169,12 +180,31 @@ func (e *endpointsController) buildIstioEndpoints(endpoint any, host host.Name) 
 
 	discoverabilityPolicy := e.c.exports.EndpointDiscoverabilityPolicy(e.c.GetService(host))
 
+	key := types.NamespacedName{Namespace: ep.Namespace, Name: ep.Name}
+	oldWes := e.weCache.Get(key)
 	for _, ss := range ep.Subsets {
 		endpoints = append(endpoints, e.buildIstioEndpointFromAddress(ep, ss, ss.Addresses, host, discoverabilityPolicy, model.Healthy)...)
 		if features.SendUnhealthyEndpoints.Load() {
 			endpoints = append(endpoints, e.buildIstioEndpointFromAddress(ep, ss, ss.NotReadyAddresses, host, discoverabilityPolicy, model.UnHealthy)...)
 		}
 	}
+
+	// If the ep is not converted to WorkloadEntry after conversion,
+	//the storage unit corresponding to the endpoint is deleted
+	newWes := e.weCache.Get(key)
+	if len(oldWes) != 0 || len(newWes) != 0 {
+		configsUpdated := sets.New[model.ConfigKey]()
+		for _, we := range newWes {
+			configsUpdated.Insert(model.ConfigKey{Kind: kind.MustFromGVK(gvk.WorkloadEntry), Name: we.Name, Namespace: we.Namespace})
+		}
+		pushReq := &model.PushRequest{
+			Full:           true,
+			ConfigsUpdated: configsUpdated,
+			Reason:         []model.TriggerReason{model.ConfigUpdate},
+		}
+		e.c.opts.XDSUpdater.ConfigUpdate(pushReq)
+	}
+
 	return endpoints
 }
 
@@ -212,6 +242,7 @@ func (e *endpointsController) buildIstioEndpointFromAddress(ep *v1.Endpoints, ss
 	host host.Name, discoverabilityPolicy model.EndpointDiscoverabilityPolicy, health model.HealthStatus,
 ) []*model.IstioEndpoint {
 	var istioEndpoints []*model.IstioEndpoint
+	var workloadEntris []*networkingv1alpha3.WorkloadEntry
 	for _, ea := range endpoints {
 		pod, expectedPod := getPod(e.c, ea.IP, &metav1.ObjectMeta{Name: ep.Name, Namespace: ep.Namespace}, ea.TargetRef, host)
 		if pod == nil && expectedPod {
@@ -223,7 +254,19 @@ func (e *endpointsController) buildIstioEndpointFromAddress(ep *v1.Endpoints, ss
 			istioEndpoint := builder.buildIstioEndpoint(ea.IP, port.Port, port.Name, discoverabilityPolicy, health)
 			istioEndpoints = append(istioEndpoints, istioEndpoint)
 		}
+
+		// Construction of WorkloadEntry based on Endpoints
+		ports := make(map[string]uint32)
+		for _, ep := range ss.Ports {
+			ports[ep.Name] = uint32(ep.Port)
+		}
+		we := builder.buildWorkloadEntry(ea.IP, ports)
+		workloadEntris = append(workloadEntris, we)
 	}
+
+	key := types.NamespacedName{Namespace: ep.Namespace, Name: ep.Name}
+	e.weCache.Update(key, workloadEntris)
+
 	return istioEndpoints
 }
 
@@ -257,4 +300,49 @@ func endpointsEqual(a, b *v1.Endpoints) bool {
 		}
 	}
 	return true
+}
+
+type workloadEntryCache struct {
+	mu                        sync.RWMutex
+	workloadEntriesByEndpoint map[types.NamespacedName][]*networkingv1alpha3.WorkloadEntry
+}
+
+func (w *workloadEntryCache) Update(ep types.NamespacedName, wes []*networkingv1alpha3.WorkloadEntry) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if len(wes) == 0 {
+		delete(w.workloadEntriesByEndpoint, ep)
+		return
+	}
+	w.workloadEntriesByEndpoint[ep] = wes
+}
+
+func (w *workloadEntryCache) Delete(ep types.NamespacedName) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	delete(w.workloadEntriesByEndpoint, ep)
+}
+
+func (w *workloadEntryCache) Get(ep types.NamespacedName) []*networkingv1alpha3.WorkloadEntry {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
+	if we, f := w.workloadEntriesByEndpoint[ep]; f {
+		return we
+	}
+	return make([]*networkingv1alpha3.WorkloadEntry, 0)
+}
+
+func (w *workloadEntryCache) GetAll() []*networkingv1alpha3.WorkloadEntry {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
+	allWes := make([]*networkingv1alpha3.WorkloadEntry, 0)
+	for _, wes := range w.workloadEntriesByEndpoint {
+		allWes = append(allWes, wes...)
+	}
+
+	return allWes
 }

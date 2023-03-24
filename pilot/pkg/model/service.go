@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"istio.io/api/label"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"istio.io/istio/pilot/pkg/serviceregistry/provider"
 	"istio.io/istio/pkg/cluster"
 	"istio.io/istio/pkg/config/constants"
@@ -764,6 +765,8 @@ type ServiceDiscovery interface {
 	// EDS calls it for building the endpoints result.
 	// Consult istio-dev before using this for anything else (except debugging/tools)
 	InstancesByPort(svc *Service, servicePort int) []*ServiceInstance
+
+	WorkloadEntries() []*networkingv1alpha3.WorkloadEntry
 
 	// GetProxyServiceInstances returns the service instances that co-located with a given Proxy
 	//

@@ -38,6 +38,7 @@ import (
 	networking "istio.io/api/networking/v1alpha3"
 	securityBeta "istio.io/api/security/v1beta1"
 	selectorpb "istio.io/api/type/v1beta1"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"istio.io/istio/pilot/pkg/features"
 	istionetworking "istio.io/istio/pilot/pkg/networking"
 	"istio.io/istio/pkg/config"
@@ -2690,6 +2691,11 @@ func (l *localServiceDiscovery) Services() []*Service {
 }
 
 func (l *localServiceDiscovery) GetService(host.Name) *Service {
+	panic("implement me")
+}
+
+// WorkloadEntries ...
+func (c *localServiceDiscovery) WorkloadEntries() []*networkingv1alpha3.WorkloadEntry {
 	panic("implement me")
 }
 

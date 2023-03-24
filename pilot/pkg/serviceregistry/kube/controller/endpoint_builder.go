@@ -15,7 +15,11 @@
 package controller
 
 import (
+	networking "istio.io/api/networking/v1alpha3"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
+	"istio.io/istio/pkg/spiffe"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"istio.io/api/label"
 	"istio.io/istio/pilot/pkg/model"
@@ -142,6 +146,44 @@ func (b *EndpointBuilder) buildIstioEndpoint(
 		DiscoverabilityPolicy: discoverabilityPolicy,
 		HealthStatus:          healthStatus,
 		NodeName:              b.nodeName,
+	}
+}
+
+func (b *EndpointBuilder) buildWorkloadEntry(endpointAddress string, ports map[string]uint32) *networkingv1alpha3.WorkloadEntry {
+	if b == nil {
+		return nil
+	}
+
+	// in case pod is not found when init EndpointBuilder.
+	networkID := network.ID(b.labels[label.TopologyNetwork.Name])
+	if networkID == "" {
+		networkID = b.endpointNetwork(endpointAddress)
+		b.labels[label.TopologyNetwork.Name] = string(networkID)
+	}
+
+	var sa string
+	identity, err := spiffe.ParseIdentity(b.serviceAccount)
+	if err != nil {
+		sa = b.serviceAccount
+		log.Debugf(err)
+	} else {
+		sa = identity.ServiceAccount
+	}
+
+	return &networkingv1alpha3.WorkloadEntry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      b.workloadName + "-" + endpointAddress,
+			Namespace: b.namespace,
+		},
+		Spec: networking.WorkloadEntry{
+			Address:        endpointAddress,
+			Labels:         b.labels,
+			ServiceAccount: sa,
+			Locality:       b.locality.Label,
+			Network:        networkID.String(),
+			Weight:         0,
+			Ports:          ports,
+		},
 	}
 }
 

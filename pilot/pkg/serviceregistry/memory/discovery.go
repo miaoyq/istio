@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"sync"
 
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/serviceregistry/provider"
 	"istio.io/istio/pkg/cluster"
@@ -299,6 +300,11 @@ func (sd *ServiceDiscovery) GetService(hostname host.Name) *model.Service {
 	sd.mutex.Lock()
 	defer sd.mutex.Unlock()
 	return sd.services[hostname]
+}
+
+// WorkloadEntries ...
+func (c *ServiceDiscovery) WorkloadEntries() []*networkingv1alpha3.WorkloadEntry {
+	return nil
 }
 
 // InstancesByPort filters the service instances by labels. This assumes single port, as is
