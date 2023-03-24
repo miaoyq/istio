@@ -36,7 +36,7 @@ import (
 
 type endpointsController struct {
 	endpoints kclient.Client[*v1.Endpoints]
-	weCache   workloadEntryCache
+	weCache   *workloadEntryCache
 	c         *Controller
 }
 
@@ -46,6 +46,7 @@ func newEndpointsController(c *Controller) *endpointsController {
 	endpoints := kclient.NewFiltered[*v1.Endpoints](c.client, kclient.Filter{ObjectFilter: c.opts.GetFilter()})
 	out := &endpointsController{
 		endpoints: endpoints,
+		weCache:   newWorkloadEntryCache(),
 		c:         c,
 	}
 	registerHandlers[*v1.Endpoints](c, endpoints, "Endpoints", out.onEvent, endpointsEqual)
@@ -305,6 +306,13 @@ func endpointsEqual(a, b *v1.Endpoints) bool {
 type workloadEntryCache struct {
 	mu                        sync.RWMutex
 	workloadEntriesByEndpoint map[types.NamespacedName][]*networkingv1alpha3.WorkloadEntry
+}
+
+func newWorkloadEntryCache() *workloadEntryCache {
+	out := &workloadEntryCache{
+		workloadEntriesByEndpoint: make(map[types.NamespacedName][]*networkingv1alpha3.WorkloadEntry),
+	}
+	return out
 }
 
 func (w *workloadEntryCache) Update(ep types.NamespacedName, wes []*networkingv1alpha3.WorkloadEntry) {

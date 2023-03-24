@@ -39,7 +39,7 @@ import (
 
 type endpointSliceController struct {
 	endpointCache *endpointSliceCache
-	weCache       workloadEntryCache
+	weCache       *workloadEntryCache
 	slices        kclient.Client[*v1.EndpointSlice]
 	c             *Controller
 }
@@ -59,6 +59,7 @@ func newEndpointSliceController(c *Controller) *endpointSliceController {
 		c:             c,
 		slices:        slices,
 		endpointCache: newEndpointSliceCache(),
+		weCache:       newWorkloadEntryCache(),
 	}
 	registerHandlers[*v1.EndpointSlice](c, slices, "EndpointSlice", out.onEvent, nil)
 	return out
