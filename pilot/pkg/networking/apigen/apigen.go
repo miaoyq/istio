@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	"istio.io/api/label"
 	"istio.io/istio/pilot/pkg/config/kube/crdclient"
 
 	"istio.io/istio/pilot/pkg/model"
@@ -133,31 +134,15 @@ func (g *APIGenerator) Generate(proxy *model.Proxy, w *model.WatchedResource, re
 		}
 	}
 
-	//svcs := g.svcDiscovery.Services()
-	//instances := make([]*model.ServiceInstance, 0)
-	//for _, svc := range svcs {
-	//	for _, p := range svc.Ports {
-	//		insts := g.svcDiscovery.InstancesByPort(svc, p.Port)
-	//		instances = append(instances, insts...)
-	//	}
-	//}
-
 	if w.TypeUrl == gvk.WorkloadEntry.String() {
-		//configs := serviceentry.ServiceInstancesToWorkloadEntries(instances)
-		//for _, c := range configs {
-		//	b, err := config.PilotConfigToResource(c)
-		//	if err != nil {
-		//		log.Warn("Resource error ", err, " ", c.Namespace, "/", c.Name)
-		//		continue
-		//	}
-		//	resp = append(resp, &discovery.Resource{
-		//		Name:     c.Namespace + "/" + c.Name,
-		//		Resource: protoconv.MessageToAny(b),
-		//	})
-		//}
-
 		wes := g.svcDiscovery.WorkloadEntries()
 		for _, we := range wes {
+			labels := we.Spec.Labels
+			if cluster := labels[label.TopologyCluster.Name]; cluster != "" && cluster == proxy.Metadata.ClusterID.String() {
+				log.Debugf("Skipping push to %v, no updates required, the WorkloadEntry and proxy belong to the same cluster %s", proxy.ID, cluster)
+				continue
+			}
+
 			weConfig := crdclient.TranslateObject(we, gvk.WorkloadEntry, "")
 			b, err := config.PilotConfigToResource(&weConfig)
 			if err != nil {
