@@ -23,7 +23,7 @@ import (
 // of a given service.
 func ByServiceSelector(namespace string, selector labels.Instance) func(*model.WorkloadInstance) bool {
 	return func(wi *model.WorkloadInstance) bool {
-		return wi.Namespace == namespace && selector.SubsetOf(wi.Endpoint.Labels)
+		return wi.Namespace == namespace && len(selector) > 0 && selector.SubsetOf(wi.Endpoint.Labels)
 	}
 }
 

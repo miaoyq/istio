@@ -951,7 +951,7 @@ func (c *Controller) serviceInstancesFromWorkloadInstances(svc *model.Service, r
 		if wi.Namespace != svc.Attributes.Namespace {
 			return
 		}
-		if selector.SubsetOf(wi.Endpoint.Labels) {
+		if len(selector) > 0 && selector.SubsetOf(wi.Endpoint.Labels) {
 			instance := serviceInstanceFromWorkloadInstance(svc, servicePort, targetPort, wi)
 			if instance != nil {
 				out = append(out, instance)
